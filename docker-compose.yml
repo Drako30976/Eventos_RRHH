@@ -1,0 +1,33 @@
+version: '3.8'
+
+services:
+  # Servicio de Base de Datos PostgreSQL
+  postgres:
+    image: postgres:16-alpine
+    container_name: eventos_rrhh_postgres
+    restart: always
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: eventos_rrhh_db
+      POSTGRES_USER: postgres_rrhh
+      POSTGRES_PASSWORD: postgres_secret_123
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
+
+  # Panel de Administración Visual de la Base de Datos (pgAdmin 4)
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: eventos_rrhh_pgadmin
+    restart: always
+    ports:
+      - "8080:80"
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@rrhh.local
+      PGADMIN_DEFAULT_PASSWORD: admin
+    depends_on:
+      - postgres
+
+volumes:
+  postgres_data:
