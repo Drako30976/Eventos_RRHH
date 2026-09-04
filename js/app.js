@@ -2,7 +2,8 @@
    LÓGICA DEL FRONTEND - GESTOR DE EVENTOS DE RRHH
    ========================================================= */
 
-const API_BASE_URL = 'http://localhost:3000/api';
+// Usar ruta relativa '/api' para que funcione dinámicamente tanto en localhost como en Render.com
+const API_BASE_URL = '/api';
 
 // Estado global de la aplicación
 const state = {
