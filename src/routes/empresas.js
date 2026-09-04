@@ -1,8 +1,48 @@
 const express = require('express');
 const router = express.Router();
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
 const pool = require('../db');
 
-// 1. GET /api/empresas - Obtener todas las empresas
+// Configuración de Multer para subir logos de empresas
+const uploadLogoDir = path.join(__dirname, '../../uploads/logos');
+if (!fs.existsSync(uploadLogoDir)) {
+  fs.mkdirSync(uploadLogoDir, { recursive: true });
+}
+
+const storageLogo = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, uploadLogoDir),
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname);
+    cb(null, `logo_${Date.now()}_${Math.round(Math.random() * 1e9)}${ext}`);
+  }
+});
+
+const uploadLogo = multer({
+  storage: storageLogo,
+  limits: { fileSize: 5 * 1024 * 1024 }
+});
+
+// 1. POST /api/empresas/upload-logo - Subir imagen del logo de la empresa
+router.post('/upload-logo', uploadLogo.single('logo'), (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ status: 'error', message: 'No se subió ninguna imagen de logo' });
+    }
+    const logo_url = `/uploads/logos/${req.file.filename}`;
+    res.json({
+      status: 'success',
+      message: 'Logo subido exitosamente',
+      logo_url
+    });
+  } catch (error) {
+    console.error('Error al subir logo:', error);
+    res.status(500).json({ status: 'error', message: 'Error al procesar el logo' });
+  }
+});
+
+// 2. GET /api/empresas - Obtener todas las empresas
 router.get('/', async (req, res) => {
   try {
     const result = await pool.query('SELECT * FROM empresas ORDER BY nombre ASC');
@@ -16,7 +56,7 @@ router.get('/', async (req, res) => {
   }
 });
 
-// 2. GET /api/empresas/:id - Obtener una empresa por su ID
+// 3. GET /api/empresas/:id - Obtener una empresa por ID
 router.get('/:id', async (req, res) => {
   try {
     const { id } = req.params;
@@ -36,12 +76,11 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// 3. POST /api/empresas - Crear una nueva empresa
+// 4. POST /api/empresas - Crear una nueva empresa
 router.post('/', async (req, res) => {
   try {
     const { nombre, cuit, logo_url } = req.body;
 
-    // Validación básica de campos obligatorios
     if (!nombre || !cuit) {
       return res.status(400).json({ status: 'error', message: 'El nombre y el CUIT son obligatorios' });
     }
@@ -62,17 +101,14 @@ router.post('/', async (req, res) => {
     });
   } catch (error) {
     console.error('Error al registrar empresa:', error);
-    
-    // Código de error de PostgreSQL para valor duplicado (Unique Constraint Violation)
     if (error.code === '23505') {
       return res.status(400).json({ status: 'error', message: 'Ya existe una empresa registrada con ese CUIT' });
     }
-
     res.status(500).json({ status: 'error', message: 'Error en el servidor al registrar empresa' });
   }
 });
 
-// 4. PUT /api/empresas/:id - Actualizar datos de una empresa
+// 5. PUT /api/empresas/:id - Actualizar empresa
 router.put('/:id', async (req, res) => {
   try {
     const { id } = req.params;
@@ -110,7 +146,7 @@ router.put('/:id', async (req, res) => {
   }
 });
 
-// 5. DELETE /api/empresas/:id - Eliminar una empresa
+// 6. DELETE /api/empresas/:id - Eliminar empresa
 router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params;
@@ -126,15 +162,12 @@ router.delete('/:id', async (req, res) => {
     });
   } catch (error) {
     console.error('Error al eliminar empresa:', error);
-
-    // Código 23503: Foreign Key Constraint Violation (Hay empleados asignados a esta empresa)
     if (error.code === '23503') {
       return res.status(400).json({ 
         status: 'error', 
         message: 'No se puede eliminar la empresa porque existen empleados registrados pertenecientes a ella.' 
       });
     }
-
     res.status(500).json({ status: 'error', message: 'Error en el servidor al eliminar empresa' });
   }
 });

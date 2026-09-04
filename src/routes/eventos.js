@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../db');
 
-// 1. GET /api/eventos - Listar eventos con Filtros Cruzados (Fechas, Empleado, Tipo de Evento, Empresa)
+// 1. GET /api/eventos - Listar eventos con Filtros Cruzados
 router.get('/', async (req, res) => {
   try {
     const { fecha_desde, fecha_hasta, empleado_id, tipo_evento_id, empresa_id } = req.query;
@@ -36,7 +36,6 @@ router.get('/', async (req, res) => {
     const values = [];
     let paramIndex = 1;
 
-    // Filtro 1: Rango de Fechas
     if (fecha_desde) {
       queryText += ` AND ev.fecha_registro >= $${paramIndex}`;
       values.push(fecha_desde);
@@ -47,22 +46,16 @@ router.get('/', async (req, res) => {
       values.push(fecha_hasta);
       paramIndex++;
     }
-
-    // Filtro 2: Empleado específico
     if (empleado_id) {
       queryText += ` AND ev.empleado_id = $${paramIndex}`;
       values.push(empleado_id);
       paramIndex++;
     }
-
-    // Filtro 3: Tipo de evento específico
     if (tipo_evento_id) {
       queryText += ` AND ev.tipo_evento_id = $${paramIndex}`;
       values.push(tipo_evento_id);
       paramIndex++;
     }
-
-    // Filtro 4: Empresa específica
     if (empresa_id) {
       queryText += ` AND emp.empresa_id = $${paramIndex}`;
       values.push(empresa_id);
@@ -84,9 +77,9 @@ router.get('/', async (req, res) => {
   }
 });
 
-// 2. POST /api/eventos - Registrar un nuevo Evento + Registro de Auditoría
+// 2. POST /api/eventos - Registrar Evento + Auditoría
 router.post('/', async (req, res) => {
-  const client = await pool.connect(); // Usamos una Transacción SQL para garantizar que evento + auditoría se guarden juntos
+  const client = await pool.connect();
   try {
     const { empleado_id, tipo_evento_id, descripcion, resolucion, creado_por_usuario_id } = req.body;
 
@@ -97,9 +90,8 @@ router.post('/', async (req, res) => {
       });
     }
 
-    await client.query('BEGIN'); // Inicio de Transacción SQL
+    await client.query('BEGIN');
 
-    // 1. Insertar Evento
     const insertEventoQuery = `
       INSERT INTO eventos (empleado_id, tipo_evento_id, descripcion, resolucion, creado_por_usuario_id)
       VALUES ($1, $2, $3, $4, $5)
@@ -114,7 +106,7 @@ router.post('/', async (req, res) => {
     ]);
     const nuevoEvento = eventoResult.rows[0];
 
-    // 2. Insertar Registro de Auditoría obligatoria
+    // Registro de Auditoría
     const auditQuery = `
       INSERT INTO historial_auditoria (usuario_id, accion, evento_id, detalles)
       VALUES ($1, $2, $3, $4)
@@ -123,10 +115,10 @@ router.post('/', async (req, res) => {
       creado_por_usuario_id,
       'CREAR_EVENTO',
       nuevoEvento.id,
-      `Evento creado para empleado ID ${empleado_id} con descripción: ${descripcion.substring(0, 50)}...`
+      `Nuevo evento ID #${nuevoEvento.id} registrado para empleado ID ${empleado_id}: ${descripcion}`
     ]);
 
-    await client.query('COMMIT'); // Confirmar Transacción en la BD
+    await client.query('COMMIT');
 
     res.status(201).json({
       status: 'success',
@@ -134,7 +126,7 @@ router.post('/', async (req, res) => {
       data: nuevoEvento
     });
   } catch (error) {
-    await client.query('ROLLBACK'); // Si algo falla, revertimos todos los cambios
+    await client.query('ROLLBACK');
     console.error('Error al registrar evento:', error);
     res.status(500).json({ status: 'error', message: 'Error en el servidor al guardar el evento' });
   } finally {
@@ -142,7 +134,116 @@ router.post('/', async (req, res) => {
   }
 });
 
-// 3. GET /api/eventos/auditoria - Consultar Historial de Auditoría de Seguridad
+// 3. PUT /api/eventos/:id - Editar Evento + Auditoría
+router.put('/:id', async (req, res) => {
+  const client = await pool.connect();
+  try {
+    const { id } = req.params;
+    const { empleado_id, tipo_evento_id, descripcion, resolucion, modificado_por_usuario_id } = req.body;
+
+    if (!modificado_por_usuario_id) {
+      return res.status(400).json({ status: 'error', message: 'ID del usuario modificador es requerido' });
+    }
+
+    await client.query('BEGIN');
+
+    // Consultar estado previo para detalle de auditoría
+    const prevRes = await client.query('SELECT * FROM eventos WHERE id = $1', [id]);
+    if (prevRes.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ status: 'error', message: 'Evento no encontrado' });
+    }
+    const eventoPrevio = prevRes.rows[0];
+
+    const updateQuery = `
+      UPDATE eventos
+      SET 
+        empleado_id = $1,
+        tipo_evento_id = $2,
+        descripcion = $3,
+        resolucion = $4,
+        modificado_por_usuario_id = $5,
+        updated_at = CURRENT_TIMESTAMP
+      WHERE id = $6
+      RETURNING *
+    `;
+
+    const result = await client.query(updateQuery, [
+      empleado_id,
+      tipo_evento_id,
+      descripcion,
+      resolucion || null,
+      modificado_por_usuario_id,
+      id
+    ]);
+
+    // Registro de Auditoría de Edición
+    const auditDetails = `Evento ID #${id} editado. Descripción previa: "${eventoPrevio.descripcion}" -> Nueva: "${descripcion}"`;
+    await client.query(
+      'INSERT INTO historial_auditoria (usuario_id, accion, evento_id, detalles) VALUES ($1, $2, $3, $4)',
+      [modificado_por_usuario_id, 'EDITAR_EVENTO', id, auditDetails]
+    );
+
+    await client.query('COMMIT');
+
+    res.json({
+      status: 'success',
+      message: 'Evento actualizado exitosamente',
+      data: result.rows[0]
+    });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Error al editar evento:', error);
+    res.status(500).json({ status: 'error', message: 'Error en el servidor al editar evento' });
+  } finally {
+    client.release();
+  }
+});
+
+// 4. DELETE /api/eventos/:id - Eliminar Evento + Auditoría
+router.delete('/:id', async (req, res) => {
+  const client = await pool.connect();
+  try {
+    const { id } = req.params;
+    const { usuario_id } = req.query; // ID de quien solicita el borrado
+
+    await client.query('BEGIN');
+
+    // Obtener detalles antes del borrado
+    const prevRes = await client.query('SELECT e.*, emp.nombre_completo FROM eventos e JOIN empleados emp ON e.empleado_id = emp.id WHERE e.id = $1', [id]);
+    if (prevRes.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ status: 'error', message: 'Evento no encontrado' });
+    }
+    const evento = prevRes.rows[0];
+
+    // Eliminar Evento (Cascade borrará archivos_evento)
+    await client.query('DELETE FROM eventos WHERE id = $1', [id]);
+
+    // Registro de Auditoría de Eliminación
+    if (usuario_id) {
+      await client.query(
+        'INSERT INTO historial_auditoria (usuario_id, accion, detalles) VALUES ($1, $2, $3)',
+        [usuario_id, 'ELIMINAR_EVENTO', `Evento ID #${id} perteneciente al empleado ${evento.nombre_completo} fue ELIMINADO del sistema.`]
+      );
+    }
+
+    await client.query('COMMIT');
+
+    res.json({
+      status: 'success',
+      message: 'Evento eliminado exitosamente del sistema'
+    });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Error al eliminar evento:', error);
+    res.status(500).json({ status: 'error', message: 'Error en el servidor al eliminar evento' });
+  } finally {
+    client.release();
+  }
+});
+
+// 5. GET /api/eventos/auditoria - Historial de Auditoría
 router.get('/auditoria', async (req, res) => {
   try {
     const queryText = `

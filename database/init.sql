@@ -2,16 +2,20 @@
 -- ESQUEMA INICIAL DE BASE DE DATOS POSTGRESQL - EVENTOS_RRHH
 -- =========================================================
 
--- 1. TABLA: usuarios (Acceso y roles de plataforma)
+-- 1. TABLA: usuarios (Acceso, fotos y roles de plataforma)
 CREATE TABLE IF NOT EXISTS usuarios (
     id SERIAL PRIMARY KEY,
     nombre_usuario VARCHAR(50) NOT NULL UNIQUE,
     email VARCHAR(100) NOT NULL UNIQUE,
     password_hash VARCHAR(255) NOT NULL,
     rol VARCHAR(20) NOT NULL CHECK (rol IN ('ADMIN', 'SUPER_USER', 'USER')),
+    foto_url VARCHAR(255),
     activo BOOLEAN NOT NULL DEFAULT TRUE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Asegurar columna foto_url por si la tabla ya existía
+ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS foto_url VARCHAR(255);
 
 -- 2. TABLA: empresas
 CREATE TABLE IF NOT EXISTS empresas (
@@ -106,7 +110,7 @@ INSERT INTO tipos_evento (etiqueta, descripcion) VALUES
     ('Capacitación / Evento Corporal', 'Asistencia a cursos, talleres o actividades corporativas')
 ON CONFLICT (etiqueta) DO NOTHING;
 
--- Usuario administrador por defecto (password hash provisional para pruebas)
+-- Usuario administrador por defecto con password encriptado bcrypt: Oblivion.1702
 INSERT INTO usuarios (nombre_usuario, email, password_hash, rol) VALUES
-    ('admin', 'admin@eventosrrhh.local', 'admin123_hash_provisional', 'ADMIN')
-ON CONFLICT (nombre_usuario) DO NOTHING;
+    ('admin', 'admin@eventosrrhh.local', '$2a$10$llSz24WNIfPzkb5iw7ProuCjTK3f6nzGg4kf0PiQFntyt1bUp7it2', 'ADMIN')
+ON CONFLICT (nombre_usuario) DO UPDATE SET password_hash = '$2a$10$llSz24WNIfPzkb5iw7ProuCjTK3f6nzGg4kf0PiQFntyt1bUp7it2';
