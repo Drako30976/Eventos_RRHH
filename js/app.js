@@ -90,18 +90,26 @@ function mostrarLogin() {
   document.getElementById('app-wrapper').style.display = 'none';
 }
 
+function resolverAvatarUrl(fotoUrl, nombreUsuario) {
+  if (!fotoUrl || fotoUrl.trim() === '') {
+    return `https://ui-avatars.com/api/?name=${encodeURIComponent(nombreUsuario)}&background=2b5797&color=fff`;
+  }
+  return fotoUrl;
+}
+
 function mostrarApp() {
   document.getElementById('login-overlay').classList.remove('active');
   document.getElementById('app-wrapper').style.display = 'block';
 
   document.getElementById('lbl-usuario').textContent = state.usuarioActual.nombre_usuario;
-  document.getElementById('lbl-rol').textContent = state.usuarioActual.rol;
 
-  const defaultAvatar = `https://ui-avatars.com/api/?name=${state.usuarioActual.nombre_usuario}&background=2b5797&color=fff`;
-  const avatarUrl = state.usuarioActual.foto_url || defaultAvatar;
+  const avatarUrl = resolverAvatarUrl(state.usuarioActual.foto_url, state.usuarioActual.nombre_usuario);
 
-  document.getElementById('header-avatar').src = avatarUrl;
-  document.getElementById('perfil-avatar-img').src = avatarUrl;
+  const headerAvatar = document.getElementById('header-avatar');
+  const perfilAvatar = document.getElementById('perfil-avatar-img');
+
+  if (headerAvatar) headerAvatar.src = avatarUrl;
+  if (perfilAvatar) perfilAvatar.src = avatarUrl;
   document.getElementById('perfil-foto-url').value = state.usuarioActual.foto_url || '';
 
   aplicarPermisosRol();
@@ -127,10 +135,10 @@ function aplicarPermisosRol() {
 }
 
 /* ---------------------------------------------------------
-   2. SUBIDA DE ARCHIVOS (AVATAR Y LOGO DE EMPRESA)
+   2. SUBIDA DE ARCHIVOS (AVATAR DE USUARIO Y LOGO DE EMPRESA)
    --------------------------------------------------------- */
 function initFileUpload() {
-  // Subida de foto de perfil
+  // 1. Subida de foto de perfil del usuario logueado
   const fileInputPerfil = document.getElementById('perfil-foto-file');
   fileInputPerfil.addEventListener('change', async () => {
     if (!fileInputPerfil.files || fileInputPerfil.files.length === 0) return;
@@ -143,12 +151,30 @@ function initFileUpload() {
       if (res.ok) {
         document.getElementById('perfil-foto-url').value = data.avatar_url;
         document.getElementById('perfil-avatar-img').src = data.avatar_url;
-        alert('Foto de perfil subida exitosamente!');
+        document.getElementById('header-avatar').src = data.avatar_url;
+        alert('Foto de perfil cargada exitosamente desde su PC!');
       } else alert(`Error: ${data.message}`);
-    } catch (err) { alert('Error al subir imagen'); }
+    } catch (err) { alert('Error al subir imagen de perfil'); }
   });
 
-  // Subida de logo de empresa desde PC
+  // 2. Subida de foto de perfil desde el Modal de Crear/Editar Usuario (Admin/SuperUser)
+  const fileInputUsrModal = document.getElementById('usr-foto-file');
+  fileInputUsrModal.addEventListener('change', async () => {
+    if (!fileInputUsrModal.files || fileInputUsrModal.files.length === 0) return;
+    const formData = new FormData();
+    formData.append('avatar', fileInputUsrModal.files[0]);
+
+    try {
+      const res = await fetch(`${API_BASE_URL}/auth/upload-avatar`, { method: 'POST', body: formData });
+      const data = await res.json();
+      if (res.ok) {
+        document.getElementById('usr-foto').value = data.avatar_url;
+        alert('Foto del nuevo usuario cargada exitosamente!');
+      } else alert(`Error: ${data.message}`);
+    } catch (err) { alert('Error al subir foto de usuario'); }
+  });
+
+  // 3. Subida de logo de empresa desde PC
   const fileInputLogo = document.getElementById('empresa-logo-file');
   fileInputLogo.addEventListener('change', async () => {
     if (!fileInputLogo.files || fileInputLogo.files.length === 0) return;
@@ -160,7 +186,7 @@ function initFileUpload() {
       const data = await res.json();
       if (res.ok) {
         document.getElementById('empresa-logo').value = data.logo_url;
-        alert('Logo de la empresa cargado exitosamente desde la PC!');
+        alert('Logo de la empresa cargado exitosamente desde su PC!');
       } else alert(`Error: ${data.message}`);
     } catch (err) { alert('Error al subir logo'); }
   });
@@ -187,7 +213,7 @@ function initTabs() {
 function initModals() {
   document.getElementById('btn-nuevo-evento').addEventListener('click', () => abrirModalEvento());
   document.getElementById('btn-nuevo-empleado').addEventListener('click', () => abrirModal('modal-empleado'));
-  document.getElementById('btn-nueva-empresa').addEventListener('click', () => abrirModal('modal-empresa'));
+  document.getElementById('btn-nueva-empresa').addEventListener('click', () => abrirModalEmpresa());
   document.getElementById('btn-nuevo-tipo-evento').addEventListener('click', () => abrirModalTipoEvento());
   document.getElementById('btn-nuevo-usuario-modal').addEventListener('click', () => abrirModalUsuario());
 
@@ -316,14 +342,22 @@ function poblarSelectores() {
 function renderEmpresas() {
   const tbody = document.getElementById('tbody-empresas');
   tbody.innerHTML = '';
+  const esModificable = (state.usuarioActual.rol === 'ADMIN' || state.usuarioActual.rol === 'SUPER_USER');
+
   state.empresas.forEach(emp => {
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td>${emp.id}</td>
       <td><strong>${emp.nombre}</strong></td>
       <td>${emp.cuit}</td>
-      <td>${emp.logo_url ? `<a href="${emp.logo_url}" target="_blank" class="badge badge-info" style="text-decoration:none;">🖼️ Logo</a>` : '<span class="badge badge-secondary" style="background:#e0e0e0;color:#666;">Sin Logo</span>'}</td>
+      <td>${emp.logo_url ? `<img src="${emp.logo_url}" class="logo-thumb" alt="Logo de ${emp.nombre}">` : '<span class="badge badge-secondary">Sin Logo</span>'}</td>
       <td>${new Date(emp.created_at).toLocaleDateString()}</td>
+      <td>
+        ${esModificable ? `
+          <button class="btn btn-primary btn-sm" onclick="editarEmpresa(${emp.id})">✏️ Editar</button>
+          <button class="btn btn-danger btn-sm" onclick="eliminarEmpresa(${emp.id})">🗑️ Borrar</button>
+        ` : '<span class="badge badge-info">Solo Lectura</span>'}
+      </td>
     `;
     tbody.appendChild(tr);
   });
@@ -457,8 +491,45 @@ function renderUsuariosAdmin() {
 }
 
 /* ---------------------------------------------------------
-   7. MODALES Y ACCIONES
+   7. MODALES Y ACCIONES (EMPRESAS, EVENTOS, TIPOS DE EVENTO, USUARIOS)
    --------------------------------------------------------- */
+function abrirModalEmpresa(empObj = null) {
+  const modalTitle = document.getElementById('modal-empresa-title');
+  const editIdInput = document.getElementById('empresa-edit-id');
+
+  if (empObj) {
+    modalTitle.textContent = '✏️ Editar Empresa';
+    editIdInput.value = empObj.id;
+    document.getElementById('empresa-nombre').value = empObj.nombre;
+    document.getElementById('empresa-cuit').value = empObj.cuit;
+    document.getElementById('empresa-logo').value = empObj.logo_url || '';
+  } else {
+    modalTitle.textContent = '➕ Registrar Nueva Empresa';
+    editIdInput.value = '';
+    document.getElementById('form-empresa').reset();
+    document.getElementById('empresa-logo').value = '';
+  }
+  document.getElementById('empresa-logo-file').value = '';
+  abrirModal('modal-empresa');
+}
+
+window.editarEmpresa = function(id) {
+  const emp = state.empresas.find(e => e.id === id);
+  if (emp) abrirModalEmpresa(emp);
+};
+
+window.eliminarEmpresa = async function(id) {
+  if (!confirm(`¿Está seguro de eliminar la empresa ID #${id}?`)) return;
+  try {
+    const res = await fetch(`${API_BASE_URL}/empresas/${id}`, { method: 'DELETE' });
+    const data = await res.json();
+    if (res.ok) {
+      alert('Empresa eliminada exitosamente.');
+      cargarTodo();
+    } else alert(`Error: ${data.message}`);
+  } catch (err) { alert('Error de conexión'); }
+};
+
 function abrirModalUsuario(usrObj = null) {
   const modalTitle = document.getElementById('modal-usuario-title');
   const editIdInput = document.getElementById('usr-edit-id');
@@ -477,8 +548,10 @@ function abrirModalUsuario(usrObj = null) {
     modalTitle.textContent = '➕ Crear Nuevo Usuario del Sistema';
     editIdInput.value = '';
     document.getElementById('form-crear-usuario').reset();
+    document.getElementById('usr-foto').value = '';
     groupRol.style.display = 'block';
   }
+  document.getElementById('usr-foto-file').value = '';
   abrirModal('modal-usuario');
 }
 
@@ -583,6 +656,37 @@ function initForms() {
   document.getElementById('form-perfil').addEventListener('submit', guardarPerfil);
 }
 
+async function guardarEmpresa(e) {
+  e.preventDefault();
+  const editId = document.getElementById('empresa-edit-id').value;
+  const nombre = document.getElementById('empresa-nombre').value.trim();
+  const cuit = document.getElementById('empresa-cuit').value.trim();
+  const logo_url = document.getElementById('empresa-logo').value.trim();
+
+  if (!nombre || !cuit) return alert('Nombre y CUIT obligatorios');
+
+  const isEdit = Boolean(editId);
+  const url = isEdit ? `${API_BASE_URL}/empresas/${editId}` : `${API_BASE_URL}/empresas`;
+  const method = isEdit ? 'PUT' : 'POST';
+
+  try {
+    const res = await fetch(url, {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ nombre, cuit, logo_url })
+    });
+    const data = await res.json();
+    if (res.ok) {
+      alert(isEdit ? 'Empresa actualizada exitosamente!' : 'Empresa registrada exitosamente!');
+      cerrarModal('modal-empresa');
+      document.getElementById('form-empresa').reset();
+      document.getElementById('empresa-logo-file').value = '';
+      document.getElementById('empresa-logo').value = '';
+      cargarTodo();
+    } else alert(`Error: ${data.message}`);
+  } catch (err) { alert('Error de conexión'); }
+}
+
 async function guardarTipoEvento(e) {
   e.preventDefault();
   const editId = document.getElementById('te-edit-id').value;
@@ -607,31 +711,6 @@ async function guardarTipoEvento(e) {
       cerrarModal('modal-tipo-evento');
       document.getElementById('form-tipo-evento').reset();
       cargarCatalogos();
-    } else alert(`Error: ${data.message}`);
-  } catch (err) { alert('Error de conexión'); }
-}
-
-async function guardarEmpresa(e) {
-  e.preventDefault();
-  const nombre = document.getElementById('empresa-nombre').value.trim();
-  const cuit = document.getElementById('empresa-cuit').value.trim();
-  const logo_url = document.getElementById('empresa-logo').value.trim();
-
-  if (!nombre || !cuit) return alert('Nombre y CUIT obligatorios');
-
-  try {
-    const res = await fetch(`${API_BASE_URL}/empresas`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ nombre, cuit, logo_url })
-    });
-    const data = await res.json();
-    if (res.ok) {
-      alert('Empresa guardada!');
-      cerrarModal('modal-empresa');
-      document.getElementById('form-empresa').reset();
-      document.getElementById('empresa-logo-file').value = '';
-      cargarTodo();
     } else alert(`Error: ${data.message}`);
   } catch (err) { alert('Error de conexión'); }
 }
@@ -770,6 +849,8 @@ async function guardarUsuarioAdminModal(e) {
       alert(isEdit ? 'Usuario actualizado exitosamente!' : 'Usuario creado exitosamente!');
       cerrarModal('modal-usuario');
       document.getElementById('form-crear-usuario').reset();
+      document.getElementById('usr-foto-file').value = '';
+      document.getElementById('usr-foto').value = '';
       cargarUsuariosAdmin();
       cargarAuditoria();
     } else alert(`Error: ${data.message}`);

@@ -38,8 +38,7 @@
             </div>
             <div class="user-badge">
                 <img id="header-avatar" src="https://ui-avatars.com/api/?name=Admin" class="avatar-sm" alt="Avatar">
-                <span><strong id="lbl-usuario">admin</strong></span> | 
-                <span>Rol: <strong id="lbl-rol">ADMIN</strong></span>
+                <span><strong id="lbl-usuario">admin</strong></span>
                 <button class="btn btn-secondary btn-sm" id="btn-logout" style="margin-left: 10px;">🚪 Salir</button>
             </div>
         </header>
@@ -133,6 +132,7 @@
                                     <th>CUIT</th>
                                     <th>Logo</th>
                                     <th>Fecha Registro</th>
+                                    <th>Acciones</th>
                                 </tr>
                             </thead>
                             <tbody id="tbody-empresas">
@@ -259,16 +259,13 @@
                         <h2 class="card-title">Configuración de Mi Perfil</h2>
                     </div>
                     <form id="form-perfil">
+                        <input type="hidden" id="perfil-foto-url" value="">
                         <div style="display: flex; gap: 2rem; align-items: center; margin-bottom: 1.5rem;">
                             <img id="perfil-avatar-img" src="https://ui-avatars.com/api/?name=Admin" class="avatar-lg" alt="Foto de perfil">
                             <div style="flex: 1;">
-                                <div class="form-group" style="margin-bottom: 1rem;">
+                                <div class="form-group">
                                     <label for="perfil-foto-file">📸 Subir Foto de Perfil desde mi Equipo</label>
                                     <input type="file" id="perfil-foto-file" class="form-control" accept="image/*">
-                                </div>
-                                <div class="form-group">
-                                    <label for="perfil-foto-url">O ingresar URL de Foto de Perfil</label>
-                                    <input type="url" id="perfil-foto-url" class="form-control" placeholder="https://ejemplo.com/mi-foto.jpg">
                                 </div>
                             </div>
                         </div>
@@ -318,15 +315,17 @@
     <!-- MODALES DE REGISTRO Y EDICIÓN                             -->
     <!-- ========================================================= -->
 
-    <!-- MODAL NUEVA EMPRESA -->
+    <!-- MODAL NUEVA/EDITAR EMPRESA -->
     <div class="modal-overlay" id="modal-empresa">
         <div class="modal">
             <div class="modal-header">
-                <h3>➕ Registrar Nueva Empresa</h3>
+                <h3 id="modal-empresa-title">➕ Registrar Nueva Empresa</h3>
                 <button class="modal-close" data-close="modal-empresa">&times;</button>
             </div>
             <div class="modal-body">
                 <form id="form-empresa">
+                    <input type="hidden" id="empresa-edit-id" value="">
+                    <input type="hidden" id="empresa-logo" value="">
                     <div class="form-group">
                         <label for="empresa-nombre">Nombre de la Empresa *</label>
                         <input type="text" id="empresa-nombre" class="form-control" required placeholder="Ej: Servicios Logísticos S.A.">
@@ -338,10 +337,6 @@
                     <div class="form-group">
                         <label for="empresa-logo-file">📸 Subir Logo de la Empresa desde PC</label>
                         <input type="file" id="empresa-logo-file" class="form-control" accept="image/*">
-                    </div>
-                    <div class="form-group">
-                        <label for="empresa-logo">O ingresar URL del Logo (Opcional)</label>
-                        <input type="url" id="empresa-logo" class="form-control" placeholder="https://ejemplo.com/logo.png">
                     </div>
                 </form>
             </div>
@@ -472,6 +467,7 @@
             <div class="modal-body">
                 <form id="form-crear-usuario">
                     <input type="hidden" id="usr-edit-id" value="">
+                    <input type="hidden" id="usr-foto" value="">
                     <div class="form-group">
                         <label for="usr-nombre">Nombre de Usuario *</label>
                         <input type="text" id="usr-nombre" class="form-control" required placeholder="Ej: maria.lopez">
@@ -492,8 +488,8 @@
                         </select>
                     </div>
                     <div class="form-group">
-                        <label for="usr-foto">URL Foto de Perfil (Opcional)</label>
-                        <input type="url" id="usr-foto" class="form-control" placeholder="https://ejemplo.com/foto.jpg">
+                        <label for="usr-foto-file">📸 Subir Foto de Perfil desde PC</label>
+                        <input type="file" id="usr-foto-file" class="form-control" accept="image/*">
                     </div>
                 </form>
             </div>

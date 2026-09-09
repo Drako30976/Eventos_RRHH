@@ -1,5 +1,5 @@
 /* =========================================================
-   ESTILOS GESTOR DE EVENTOS DE RRHH (CON AUTENTICACIÓN)
+   ESTILOS GESTOR DE EVENTOS DE RRHH
    ========================================================= */
 
 :root {
@@ -87,7 +87,7 @@ body {
 header {
   background-color: var(--primary-color);
   color: white;
-  padding: 1rem 2rem;
+  padding: 0.8rem 2rem;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -103,26 +103,41 @@ header {
   background-color: rgba(255, 255, 255, 0.15);
   padding: 0.4rem 1rem;
   border-radius: 20px;
-  font-size: 0.85rem;
+  font-size: 0.9rem;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
 }
 
 .avatar-sm {
-  width: 32px;
-  height: 32px;
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
   object-fit: cover;
   border: 2px solid white;
+  background-color: #ffffff;
+  display: inline-block;
 }
 
 .avatar-lg {
-  width: 80px;
-  height: 80px;
+  width: 90px;
+  height: 90px;
   border-radius: 50%;
   object-fit: cover;
   border: 3px solid var(--primary-color);
+  background-color: #ffffff;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+  display: block;
+}
+
+.logo-thumb {
+  max-height: 40px;
+  max-width: 120px;
+  object-fit: contain;
+  border-radius: 4px;
+  border: 1px solid var(--border-color);
+  background-color: #ffffff;
+  padding: 2px;
 }
 
 /* Navigation Tabs */
@@ -303,6 +318,7 @@ th, td {
   text-align: left;
   border-bottom: 1px solid var(--border-color);
   font-size: 0.9rem;
+  vertical-align: middle;
 }
 
 th {
@@ -336,6 +352,11 @@ tr:hover {
 .badge-warning {
   background-color: #fff8e1;
   color: #f57f17;
+}
+
+.badge-secondary {
+  background-color: #e0e0e0;
+  color: #666666;
 }
 
 /* Modals */
